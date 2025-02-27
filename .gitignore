@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Output directories
+bin/
+build/
+
+# Vendor directory
+vendor/
+
+# Dependency directories
+Godeps/
+vendor/
+
+# Go workspace file
+go.work
+
+# Go test binary, coverage files, and test result files
+*.test
+*.out
+*.cover
+*.cov
+*.tmp
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs
+*.log
+
+# Environment variables
+.env
