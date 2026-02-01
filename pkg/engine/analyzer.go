@@ -6,15 +6,34 @@ import (
 	"github.com/baking-bread/stencil/pkg/common"
 )
 
-type Analyzer struct {
-	fields map[string]struct{}
+func (e Engine) Analyze(templates []common.Template, values common.Values) (map[string]bool, error) {
+	return e.analyze(templates, values)
 }
 
-func NewAnalyzer() *Analyzer {
-	return &Analyzer{}
+func Analyze(templates []common.Template, values common.Values) (map[string]bool, error) {
+	return new(Engine).Analyze(templates, values)
 }
 
-func (a *Analyzer) AnalyzeTemplate(template common.Template) ([]string, error) {
+func (e Engine) analyze(templates []common.Template, values common.Values) (map[string]bool, error) {
+
+	fields := make(map[string]bool)
+
+	for _, template := range templates {
+		e.analyzeTemplate(template, &fields)
+	}
+
+	for field := range fields {
+		check := common.Pick(values, field)
+		if check != nil {
+			fields[field] = true
+		}
+	}
+
+	return fields, nil
+}
+
+func (e Engine) analyzeTemplate(template common.Template, fields *map[string]bool) (map[string]bool, error) {
+	result := make(map[string]bool)
 
 	tree, err := parse.Parse(template.Name, string(template.Data), "{{", "}}", nil)
 	if err != nil {
@@ -22,52 +41,49 @@ func (a *Analyzer) AnalyzeTemplate(template common.Template) ([]string, error) {
 	}
 
 	for _, t := range tree {
-		a.walkNode(t.Root)
-	}
-
-	result := make([]string, 0, len(a.fields))
-	for field := range a.fields {
-		result = append(result, field)
+		e.walkNode(t.Root, fields)
 	}
 
 	return result, nil
 }
 
-func (a *Analyzer) walkNode(node parse.Node) {
+func (e Engine) walkNode(node parse.Node, fields *map[string]bool) {
 	if node == nil {
 		return
 	}
 
+	_fields := *fields
+
 	switch n := node.(type) {
 	case *parse.ActionNode:
-		a.walkNode(n.Pipe)
+		e.walkNode(n.Pipe, fields)
 
 	case *parse.IfNode:
-		a.walkNode(n.Pipe)
-		a.walkNode(n.List)
-		a.walkNode(n.ElseList)
+		e.walkNode(n.Pipe, fields)
+		e.walkNode(n.List, fields)
+		e.walkNode(n.ElseList, fields)
 
 	case *parse.RangeNode:
-		a.walkNode(n.Pipe)
-		a.walkNode(n.List)
-		a.walkNode(n.ElseList)
+		e.walkNode(n.Pipe, fields)
+		e.walkNode(n.List, fields)
+		e.walkNode(n.ElseList, fields)
 
 	case *parse.ListNode:
 		if n == nil {
 			return
 		}
 		for _, node := range n.Nodes {
-			a.walkNode(node)
+			e.walkNode(node, fields)
 		}
 
 	case *parse.PipeNode:
 		for _, cmd := range n.Cmds {
-			a.walkNode(cmd)
+			e.walkNode(cmd, fields)
 		}
 
 	case *parse.CommandNode:
 		for _, arg := range n.Args {
-			a.walkNode(arg)
+			e.walkNode(arg, fields)
 		}
 
 	case *parse.FieldNode:
@@ -79,7 +95,7 @@ func (a *Analyzer) walkNode(node parse.Node) {
 			fieldPath += ident
 		}
 		if fieldPath != "" {
-			a.fields[fieldPath] = struct{}{}
+			_fields[fieldPath] = false
 		}
 
 	case *parse.VariableNode:
@@ -93,12 +109,12 @@ func (a *Analyzer) walkNode(node parse.Node) {
 					fieldPath += ident
 				}
 				if fieldPath != "" {
-					a.fields[fieldPath] = struct{}{}
+					_fields[fieldPath] = false
 				}
 			}
 		}
 
 	case *parse.TemplateNode:
-		a.walkNode(n.Pipe)
+		e.walkNode(n.Pipe, fields)
 	}
 }

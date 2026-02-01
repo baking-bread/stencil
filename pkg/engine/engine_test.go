@@ -87,6 +87,28 @@ func TestRenderRandomStringFromArrayValues(t *testing.T) {
 	}
 }
 
+func TestRenderTemplateWithFrontmatter(t *testing.T) {
+
+	var templates, err = common.LoadText("Test", "---\nfields:\n  name:\n    type: string\n---\nHello {{ .name }}!")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var values, _ = common.ReadValues(
+		[]byte("name: \"World\""),
+	)
+
+	output, err := Render(templates, values)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := "Hello World!"
+	if output["Test"] != expected {
+		t.Errorf("expected %q, got %q", expected, output["Test"])
+	}
+}
+
 func TestRenderTimestamp(t *testing.T) {
 
 	var expected = map[string]string{

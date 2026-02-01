@@ -1,14 +1,15 @@
 package common
 
 import (
+	"crypto/sha256"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 type Template struct {
-	Name string
-	Data []byte
+	Name        string
+	Data        []byte
+	Frontmatter Frontmatter
 }
 
 type TemplateLoader interface {
@@ -18,7 +19,7 @@ type TemplateLoader interface {
 func Loader(name string) (TemplateLoader, error) {
 	fi, err := os.Stat(name)
 	if err != nil {
-		return Text(name), err
+		return nil, err
 	}
 
 	if fi.IsDir() {
@@ -38,17 +39,33 @@ func Load(name string) ([]Template, error) {
 	return loader.Load()
 }
 
-type Text string
-
-func (t Text) Load() ([]Template, error) {
-	return LoadText(string(t))
+type Text struct {
+	Name string
+	Text string
 }
 
-func LoadText(text string) ([]Template, error) {
+func (t Text) Load() ([]Template, error) {
+	return LoadText(t.Name, t.Text)
+}
+
+func LoadText(name string, text string) ([]Template, error) {
+
+	fm, data, err := ParseFrontmatter([]byte(text))
+	if err != nil {
+		return nil, err
+	}
+
+	if name == "" {
+		checksum := sha256.New()
+		checksum.Write([]byte(text))
+		name = string(checksum.Sum(nil))
+	}
+
 	return []Template{
 		{
-			Name: time.Now().String(),
-			Data: []byte(text),
+			Name:        name,
+			Data:        data,
+			Frontmatter: fm,
 		},
 	}, nil
 }
@@ -113,10 +130,16 @@ func LoadFile(name string) ([]Template, error) {
 		return nil, err
 	}
 
+	fm, data, err := ParseFrontmatter(data)
+	if err != nil {
+		return nil, err
+	}
+
 	return []Template{
 		{
-			Name: name,
-			Data: data,
+			Name:        name,
+			Data:        data,
+			Frontmatter: fm,
 		},
 	}, nil
 }
